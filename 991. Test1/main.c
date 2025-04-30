@@ -1,6 +1,7 @@
 #include "device_driver.h"
 #include <stdlib.h>
 
+//------------------------------------------define---------------------------------------------//
 #define LCDW            (320)
 #define LCDH            (240)
 #define X_MIN           (0)
@@ -28,6 +29,7 @@
 /* #define ITEM_SPEED      (1) */
 #define SW0_PIN         (13) // PA13
 
+//----------------------------------------전역변수----------------------------------------------//
 static unsigned short color[] = {RED, YELLOW, GREEN, BLUE, WHITE, BLACK};
 
 extern volatile int TIM4_expired;
@@ -56,14 +58,14 @@ static int player_x = LCDW/2 - PLAYER_SIZE_X/2;
 static int player_y = LCDH - PLAYER_SIZE_Y - 10;
 
 // Bullet structure
-typedef struct {
+typedef struct {                                 
     int x, y;
     int active;
-    int owner; // 0:player, 1:enemy
+    int owner;  // 0:player, 1:enemy
 } BULLET;
 
 // Enemy structure
-typedef struct {
+typedef struct {                                
     int x, y;
     int active;
     int stop_timer;
@@ -71,7 +73,7 @@ typedef struct {
 } ENEMY;
 
 // Item structure
-typedef struct {
+typedef struct {                                   
     int x, y;
     int active;
     ITEM_TYPE type;
@@ -80,7 +82,7 @@ typedef struct {
 static BULLET bullets[BULLET_MAX];
 static ENEMY enemies[ENEMY_MAX];
 static ITEM items[ITEM_MAX];
-
+// ----------------------------------------System_Init-------------------------------------------//
 void System_Init(void)
 {
     Clock_Init();
@@ -92,6 +94,7 @@ void System_Init(void)
     SCB->SHCSR = 7<<16;
 }
 
+// ----------------------------------------Init-------------------------------------------//
 void Bullet_Init(void)
 {
     for (int i = 0; i < BULLET_MAX; i++)
@@ -116,6 +119,7 @@ void Item_Init(void)
     }
 }
 
+//-------------------------------------------Spawn----------------------------------------------//
 void Spawn_Enemy(void)
 {
     for (int i = 0; i < ENEMY_MAX; i++)
@@ -147,6 +151,7 @@ void Spawn_Item(void)
     }
 }
 
+// -------------------------------------Update : Object 행동 기술-------------------------------------//
 void Enemy_Update(void)
 {
     int i;
@@ -178,7 +183,7 @@ void Enemy_Update(void)
     }
 }
 
-void Bullet_Update(void)
+/* void Bullet_Update(void)                             //내가 쏜 총알이 화면 밖으로 나갔을 때 총알 지우기
 {
     for (int i = 0; i < BULLET_MAX; i++)
     {
@@ -191,9 +196,9 @@ void Bullet_Update(void)
             }
         }
     }
-}
+} */
 
-void Fire_Bullet(void)
+void Bullet_Update(void)
 {
     for (int i = 0; i < BULLET_MAX; i++)
     {
@@ -202,6 +207,22 @@ void Fire_Bullet(void)
             bullets[i].owner = OWNER_PLAYER;
             bullets[i].x = player_x + PLAYER_SIZE_X/2 - 2;
             bullets[i].y = player_y;
+            bullets[i].active = 1;
+            break;
+        }
+    }
+}
+
+void Bullet_Enemy_Update(int ex, int ey)
+{
+    int i;
+    for (i = 0; i < BULLET_MAX; i++)
+    {
+        if (!bullets[i].active)
+        {
+            bullets[i].owner = OWNER_ENEMY;
+            bullets[i].x = ex + 6;
+            bullets[i].y = ey + 16;
             bullets[i].active = 1;
             break;
         }
@@ -221,95 +242,10 @@ void Item_Update(void)
     }
 }
 
-void Enemy_Draw(void)
-{
-    for (int i = 0; i < ENEMY_MAX; i++)
-    {
-        if (enemies[i].active)
-        {
-            Lcd_Draw_Box(enemies[i].x, enemies[i].y, 16, 16, color[1]);
-        }
-    }
-}
-
-void Bullet_Draw(void)
-{
-    for (int i = 0; i < BULLET_MAX; i++)
-    {
-        if (bullets[i].active)
-        {
-            Lcd_Draw_Box(bullets[i].x, bullets[i].y, 4, 8, color[2]);
-        }
-    }
-}
-
-void Item_Draw(void)
-{
-    for (int i = 0; i < ITEM_MAX; i++)
-    {
-        if (items[i].active)
-        {
-            unsigned short item_color = (items[i].type == ITEM_BOMB) ? RED : (items[i].type == ITEM_UP) ? YELLOW : GREEN;
-            Lcd_Draw_Box(items[i].x, items[i].y, 10, 10, item_color);
-        }
-    }
-}
-
-
-void Game_Init(void)
-{
-    player_life = 3;
-    bomb_item = 0;
-    up_item = 0;
-    speed_item = 0;
-    player_x = LCDW/2 - PLAYER_SIZE_X/2;
-    player_y = LCDH - PLAYER_SIZE_Y - 10;
-    Lcd_Clr_Screen();
-    Bullet_Init();
-    Enemy_Init();
-    Item_Init();
-}
-
+//충돌 체크 선언 및 충돌 업데이트
 int Check_Collision(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2)
 {
     return (x1 < x2 + w2) && (x1 + w1 > x2) && (y1 < y2 + h2) && (y1 + h1 > y2);
-}
-
-void Draw_HUD(void)
-{
-    Lcd_Printf(200, 220, WHITE, BLACK, 1, 1, "B:%d U:%d S:%d", bomb_item, up_item, speed_item);
-    Lcd_Printf(0, 220, WHITE, BLACK, 1, 1, "LIFE:%d", player_life);
-}
-
-void Use_Bomb(void)
-{
-    int i;
-    for (i = 0; i < ENEMY_MAX; i++)
-        enemies[i].active = 0;
-    for (i = 0; i < BULLET_MAX; i++)
-        bullets[i].active = 0;
-    Lcd_Clr_Screen();
-}
-
-void Fire_Enemy_Bullet(int ex, int ey)
-{
-    int i;
-    for (i = 0; i < BULLET_MAX; i++)
-    {
-        if (!bullets[i].active)
-        {
-            bullets[i].owner = OWNER_ENEMY;
-            bullets[i].x = ex + 6;
-            bullets[i].y = ey + 16;
-            bullets[i].active = 1;
-            break;
-        }
-    }
-}
-
-static void Draw_Object(int x, int y, int w, int h, int ci)
-{
-    Lcd_Draw_Box(x, y, w, h, color[ci]);
 }
 
 void Collision_Update(void)
@@ -370,6 +306,80 @@ void Collision_Update(void)
     }
 }
 
+//---------------------------------------------Draw -------------------------------------------//
+void Enemy_Draw(void)
+{
+    for (int i = 0; i < ENEMY_MAX; i++)
+    {
+        if (enemies[i].active)
+        {
+            Lcd_Draw_Box(enemies[i].x, enemies[i].y, 16, 16, color[1]);
+        }
+    }
+}
+
+void Bullet_Draw(void)
+{
+    for (int i = 0; i < BULLET_MAX; i++)
+    {
+        if (bullets[i].active)
+        {
+            Lcd_Draw_Box(bullets[i].x, bullets[i].y, 4, 8, color[2]);
+        }
+    }
+}
+
+void Item_Draw(void)
+{
+    for (int i = 0; i < ITEM_MAX; i++)
+    {
+        if (items[i].active)
+        {
+            unsigned short item_color = (items[i].type == ITEM_BOMB) ? RED : (items[i].type == ITEM_UP) ? YELLOW : GREEN;
+            Lcd_Draw_Box(items[i].x, items[i].y, 10, 10, item_color);
+        }
+    }
+}
+
+//------------------------------------Game_Init---------------------------------------------//
+void Game_Init(void)
+{
+    player_life = 3;
+    bomb_item = 0;
+    up_item = 0;
+    speed_item = 0;
+    player_x = LCDW/2 - PLAYER_SIZE_X/2;
+    player_y = LCDH - PLAYER_SIZE_Y - 10;
+    Lcd_Clr_Screen();
+    Bullet_Init();
+    Enemy_Init();
+    Item_Init();
+}
+
+//--------------------------------------추가 기능 ----------------------------------------------//
+
+void HUD_Draw(void)
+{
+    Lcd_Printf(200, 220, WHITE, BLACK, 1, 1, "B:%d U:%d S:%d", bomb_item, up_item, speed_item);
+    Lcd_Printf(0, 220, WHITE, BLACK, 1, 1, "LIFE:%d", player_life);
+}
+
+void Use_Bomb(void)
+{
+    int i;
+    for (i = 0; i < ENEMY_MAX; i++)
+        enemies[i].active = 0;
+    for (i = 0; i < BULLET_MAX; i++)
+        bullets[i].active = 0;
+    Lcd_Clr_Screen();
+}
+
+static void Draw_Object(int x, int y, int w, int h, int ci)
+{
+    Lcd_Draw_Box(x, y, w, h, color[ci]);
+}
+
+// ------------------------------------------Ingame play 작동 ----------------------------------------//
 void Game_Update(void)
 {
     static int fire_delay = 0;
@@ -409,7 +419,7 @@ void Game_Update(void)
         int i;
         for (i = 0; i < bullets_to_fire; i++)
         {
-            Fire_Bullet();
+            Bullet_Update();
         }
         fire_delay = fire_interval;
     }
@@ -505,14 +515,14 @@ void Game_Update(void)
         {
             if (enemies[i].active && enemies[i].y + 16 <= Y_MAX)  // 화면 안에 있는지 체크 (버그1)
             {
-                Fire_Enemy_Bullet(enemies[i].x, enemies[i].y);
+                Bullet_Enemy_Update(enemies[i].x, enemies[i].y);
             }
         }
         enemy_fire_timer = 0;
     }
 }
 
-void Game_Draw(void)
+void Play_Screen(void)
 {
     Draw_Object(player_x, player_y, PLAYER_SIZE_X, PLAYER_SIZE_Y, 0);
 
@@ -542,9 +552,10 @@ void Game_Draw(void)
         }
     }
 
-    Draw_HUD();
+    HUD_Draw();
 }
 
+// ------------------------------------- Start, Game_Over_Screen-------------------------------//
 void Start_Screen(void)
 {
     /* Lcd_Clr_Screen(); */
@@ -559,6 +570,7 @@ void Game_Over_Screen(void)
     Lcd_Printf(60, 160, BLUE, BLACK, 1, 1, "Press any key to retry");
 }
 
+// ----------------------------------------Main--------------------------------------------//
 void Main(void)
 {
     System_Init();
@@ -587,7 +599,7 @@ void Main(void)
 
         case STATE_PLAY:
             Game_Update();
-            Game_Draw();
+            Play_Screen();
             break;
 
         case STATE_GAMEOVER:
