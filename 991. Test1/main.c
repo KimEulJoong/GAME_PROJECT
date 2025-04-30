@@ -26,6 +26,12 @@
 
 #define ENEMY_STOP_MIN (LCDH / 6)
 #define ENEMY_STOP_MAX (LCDH / 3)
+#define ENEMY_RANDOM_STOP(i) \
+({ \
+    int levels[] = {LCDH/7, LCDH/6, LCDH/5, LCDH/4, LCDH/3}; \
+    levels[(SysTick->VAL + TIM2->CNT + (i * 19)) % 5]; \
+})
+
 /* #define ITEM_SPEED      (1) */
 #define SW0_PIN         (13) // PA13
 
@@ -70,6 +76,7 @@ typedef struct {
     int active;
     int stop_timer;
     int moving_down;
+    int stop_y;
 } ENEMY;
 
 // Item structure
@@ -92,6 +99,8 @@ void System_Init(void)
 
     SCB->VTOR = 0x08003000;
     SCB->SHCSR = 7<<16;
+
+    srand(SysTick->VAL + TIM4_expired);
 }
 
 // ----------------------------------------Init-------------------------------------------//
@@ -130,6 +139,10 @@ void Spawn_Enemy(void)
             enemies[i].y = 0;
             enemies[i].stop_timer = ENEMY_STOP_TIME;
             enemies[i].moving_down = 0;
+
+            srand(SysTick->VAL + TIM2->CNT + i * 37);
+            enemies[i].stop_y = ENEMY_RANDOM_STOP(i); 
+
             enemies[i].active = 1;
             break;
         }
@@ -161,7 +174,7 @@ void Enemy_Update(void)
         {
             if (!enemies[i].moving_down)
             {
-                if (enemies[i].y < LCDH / 3)
+                if (enemies[i].y < enemies[i].stop_y)
                 {
                     enemies[i].y += ENEMY_SPEED;
                 }
@@ -459,7 +472,7 @@ void Game_Update(void)
             Draw_Object(enemies[i].x, enemies[i].y, 16, 16, 5);
             if (!enemies[i].moving_down)
             {
-                if (enemies[i].y < LCDH / 3)
+                if (enemies[i].y < enemies[i].stop_y)
                     enemies[i].y += ENEMY_SPEED;
                 else
                 {
@@ -513,7 +526,7 @@ void Game_Update(void)
     {
         for (i = 0; i < ENEMY_MAX; i++)
         {
-            if (enemies[i].active && enemies[i].y + 16 <= Y_MAX)  // 화면 안에 있는지 체크 (버그1)
+            if (enemies[i].active && enemies[i].y + 16 <= Y_MAX)  // 화면 안에 있는지 체크
             {
                 Bullet_Enemy_Update(enemies[i].x, enemies[i].y);
             }
