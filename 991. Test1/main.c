@@ -17,6 +17,8 @@
 #define BULLET_SPEED    (10)
 #define ENEMY_MAX       (5)
 #define ENEMY_SPEED     (1)
+#define ENEMY_BULLET_SPEED (4)
+
 #define ENEMY_STOP_TIME (300)
 #define SPAWN_INTERVAL (70)
 #define ITEM_MAX        (5)
@@ -77,6 +79,7 @@ typedef struct {
     int stop_timer;
     int moving_down;
     int stop_y;
+    int fire_timer;
 } ENEMY;
 
 // Item structure
@@ -128,6 +131,12 @@ void Item_Init(void)
     }
 }
 
+// ----------------------------------------Draw_Object------------------------------------//
+static void Draw_Object(int x, int y, int w, int h, int ci)
+{
+    Lcd_Draw_Box(x, y, w, h, color[ci]);
+}
+
 //-------------------------------------------Spawn----------------------------------------------//
 void Spawn_Enemy(void)
 {
@@ -165,67 +174,6 @@ void Spawn_Item(void)
 }
 
 // -------------------------------------Update : Object 행동 기술-------------------------------------//
-void Enemy_Update(void)
-{
-    int i;
-    for (i = 0; i < ENEMY_MAX; i++)
-    {
-        if (enemies[i].active)
-        {
-            if (!enemies[i].moving_down)
-            {
-                if (enemies[i].y < enemies[i].stop_y)
-                {
-                    enemies[i].y += ENEMY_SPEED;
-                }
-                else
-                {
-                    if (enemies[i].stop_timer > 0)
-                        enemies[i].stop_timer--;
-                    else
-                        enemies[i].moving_down = 1;
-                }
-            }
-            else
-            {
-                enemies[i].y += ENEMY_SPEED;
-                if (enemies[i].y > Y_MAX)
-                    enemies[i].active = 0;
-            }
-        }
-    }
-}
-
-/* void Bullet_Update(void)                             //내가 쏜 총알이 화면 밖으로 나갔을 때 총알 지우기
-{
-    for (int i = 0; i < BULLET_MAX; i++)
-    {
-        if (bullets[i].active)
-        {
-            bullets[i].y -= BULLET_SPEED;
-            if (bullets[i].y < Y_MIN)
-            {
-                bullets[i].active = 0;
-            }
-        }
-    }
-} */
-
-void Bullet_Update(void)
-{
-    for (int i = 0; i < BULLET_MAX; i++)
-    {
-        if (!bullets[i].active)
-        {
-            bullets[i].owner = OWNER_PLAYER;
-            bullets[i].x = player_x + PLAYER_SIZE_X/2 - 2;
-            bullets[i].y = player_y;
-            bullets[i].active = 1;
-            break;
-        }
-    }
-}
-
 void Bullet_Enemy_Update(int ex, int ey)
 {
     int i;
@@ -242,12 +190,77 @@ void Bullet_Enemy_Update(int ex, int ey)
     }
 }
 
+void Enemy_Update(void)
+{
+    int i;
+    for (i = 0; i < ENEMY_MAX; i++)
+    {
+        if (enemies[i].active)
+        {
+            Draw_Object(enemies[i].x, enemies[i].y, 16, 16, 5);  // BLACK으로 이전 위치 지우기
+
+            if (!enemies[i].moving_down)
+            {
+                if (enemies[i].y < enemies[i].stop_y)
+                {
+                    enemies[i].y += ENEMY_SPEED;
+                }
+                else
+                {
+                    if (enemies[i].fire_timer > 0)
+                    {
+                        enemies[i].fire_timer--;
+                    }
+                    else if (enemies[i].active && enemies[i].y + 16 <= Y_MAX)
+                    {
+                        Bullet_Enemy_Update(enemies[i].x, enemies[i].y);
+                        enemies[i].fire_timer = 100 + (rand() % 100);  // 100~200 사이 랜덤 쿨타임
+                    }
+                }
+            }
+            else
+            {
+                enemies[i].y += ENEMY_SPEED;
+                if (enemies[i].y > Y_MAX)
+                    enemies[i].active = 0;
+            }
+        }
+    }
+}
+
+void Bullet_Update(int cnt)
+{
+    int center_x = player_x + PLAYER_SIZE_X / 2 - 2;  // 총알 기준 위치 중심
+
+    for (int i = 0; i < cnt; i++)
+    {
+        int offset = (i - (cnt - 1) / 2) * 10;  // 좌우 대칭으로 수정 (-20, -10, 0, +10, +20 )
+        int bullet_x = center_x + offset;  //총알 범위 검사
+
+        if (bullet_x < X_MIN || bullet_x > X_MAX - 4)   //화면을 벗어난 총알 생성 금지
+        continue;
+
+        for (int j = 0; j < BULLET_MAX; j++)
+        {
+            if (!bullets[j].active)
+            {
+                bullets[j].owner = OWNER_PLAYER;
+                bullets[j].x = center_x + offset;
+                bullets[j].y = player_y;
+                bullets[j].active = 1;
+                break;
+            }
+        }
+    }
+}
+
 void Item_Update(void)
 {
     for (int i = 0; i < ITEM_MAX; i++)
     {
         if (items[i].active)
         {
+            Draw_Object(items[i].x, items[i].y, 10, 10, 5);
             items[i].y += ITEM_SPEED;
             if (items[i].y > Y_MAX)
                 items[i].active = 0;
@@ -287,9 +300,9 @@ void Collision_Update(void)
         {
             if (items[i].type == ITEM_BOMB && bomb_item < 3)
                 bomb_item++;
-            else if (items[i].type == ITEM_UP && up_item < 5)
+            else if (items[i].type == ITEM_UP && up_item < 3)
                 up_item++;
-            else if (items[i].type == ITEM_SPEED && speed_item < 3)
+            else if (items[i].type == ITEM_SPEED && speed_item < 2)
                 speed_item++;
             items[i].active = 0;
         }
@@ -387,11 +400,6 @@ void Use_Bomb(void)
     Lcd_Clr_Screen();
 }
 
-static void Draw_Object(int x, int y, int w, int h, int ci)
-{
-    Lcd_Draw_Box(x, y, w, h, color[ci]);
-}
-
 // ------------------------------------------Ingame play 작동 ----------------------------------------//
 void Game_Update(void)
 {
@@ -429,11 +437,8 @@ void Game_Update(void)
 
     if ((GPIOA->IDR & (1 << SW0_PIN)) == 0 && fire_delay == 0)
     {
-        int i;
-        for (i = 0; i < bullets_to_fire; i++)
-        {
-            Bullet_Update();
-        }
+        Bullet_Update(bullets_to_fire);
+
         fire_delay = fire_interval;
     }
 
@@ -456,7 +461,7 @@ void Game_Update(void)
             }
             else if (bullets[i].owner == OWNER_ENEMY)
             {
-                bullets[i].y += BULLET_SPEED; // 적 총알은 아래로
+                bullets[i].y += ENEMY_BULLET_SPEED; // 적 총알은 아래로
             }
     
             // 화면을 벗어나면 비활성화
@@ -465,44 +470,9 @@ void Game_Update(void)
         }
     }
 
-    for (i = 0; i < ENEMY_MAX; i++)
-    {
-        if (enemies[i].active)
-        {
-            Draw_Object(enemies[i].x, enemies[i].y, 16, 16, 5);
-            if (!enemies[i].moving_down)
-            {
-                if (enemies[i].y < enemies[i].stop_y)
-                    enemies[i].y += ENEMY_SPEED;
-                else
-                {
-                    if (enemies[i].stop_timer > 0)
-                        enemies[i].stop_timer--;
-                    else
-                        enemies[i].moving_down = 1;
-                }
-            }
-            else
-            {
-                enemies[i].y += ENEMY_SPEED;
-                if (enemies[i].y > Y_MAX)
-                {
-                    enemies[i].active = 0; 
-                }
-            }
-        }
-    }
-
-    for (i = 0; i < ITEM_MAX; i++)
-    {
-        if (items[i].active)
-        {
-            Draw_Object(items[i].x, items[i].y, 10, 10, 5);
-            items[i].y += ITEM_SPEED;
-            if (items[i].y > Y_MAX)
-                items[i].active = 0;
-        }
-    }
+    Enemy_Update();
+    Item_Update();
+    
 
     Collision_Update();
 
