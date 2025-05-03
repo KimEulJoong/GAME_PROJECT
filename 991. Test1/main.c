@@ -122,11 +122,49 @@ const int song1[][2] = {
 };
 const char * note_name[] = {"C1", "C1#", "D1", "D1#", "E1", "F1", "F1#", "G1", "G1#", "A1", "A1#", "B1", "C2", "C2#", "D2", "D2#", "E2", "F2", "F2#", "G2", "G2#", "A2", "A2#", "B2"};
 
+const int hit_sound[][2] = {
+    {C1,  BASE / 12},
+    {REST, BASE / 30},
+    {C1,  BASE / 20},
+    {REST, BASE / 30},
+    {C1,  BASE / 16},
+};
+
+#define HIT_SOUND_LEN  (sizeof(hit_sound) / sizeof(hit_sound[0]))
+
+volatile int is_hit_sound = 0;
+volatile int hit_index = 0;
+
+
 void Play_Background_Music(void)
 {
     if (note_timer > 0)
     {
         note_timer--;
+        return;
+    }
+
+    if (is_hit_sound) 
+    {
+        int tone = hit_sound[hit_index][0];
+        int duration = hit_sound[hit_index][1];
+
+        if (tone != REST) 
+            TIM3_Out_Freq_Generation(tone_value[tone]);
+        
+        else
+            TIM3_Out_Stop();
+
+        note_timer = duration / 10;
+        hit_index++;
+
+        if (hit_index >= HIT_SOUND_LEN)
+        {
+            is_hit_sound = 0;
+            hit_index = 0;
+            note_timer = BASE / 4;
+        }
+
         return;
     }
 
@@ -138,7 +176,7 @@ void Play_Background_Music(void)
     else
         TIM3_Out_Stop();
 
-    note_timer = duration / 10; 
+    note_timer = duration / 10;
     song_index++;
 
     if (song_index >= sizeof(song1)/sizeof(song1[0]))
@@ -162,7 +200,6 @@ void System_Init(void)
     SCB->SHCSR = 7<<16;
 
     srand(SysTick->VAL + TIM2->CNT);
-
 }
 
 // ----------------------------------------Init-------------------------------------------//
@@ -354,10 +391,13 @@ void Collision_Update(void)
                     bullets[i].active = 0;
                     enemies[j].active = 0;
                     score++;
+                    is_hit_sound = 1;
+                    hit_index = 0;
                     break;
                 }
             }
         }
+        
     }
 
     for (i = 0; i < ITEM_MAX; i++)

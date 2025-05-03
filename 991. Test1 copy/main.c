@@ -37,13 +37,14 @@
 
 /* #define ITEM_SPEED      (1) */
 #define SW0_PIN         (13) // PA13
+#define BASE  (500) //msec
 
 //----------------------------------------전역변수----------------------------------------------//
 static unsigned short color[] = {RED, YELLOW, GREEN, BLUE, WHITE, BLACK};
 static int score = 0;
 static int bomb_used = 0;
 
-extern volatile int TIM4_expired;
+/* extern volatile int TIM4_expired; */
 extern volatile int Jog_key_in;
 extern volatile int Jog_key;
 
@@ -95,18 +96,72 @@ typedef struct {
 static BULLET bullets[BULLET_MAX];
 static ENEMY enemies[ENEMY_MAX];
 static ITEM items[ITEM_MAX];
+
+//-------------------------------------------BGM------------------------------------------------//
+volatile int song_index = 0;
+volatile int note_timer = 0;
+
+const static unsigned short tone_value[] = {
+    261,277,293,311,329,349,369,391,415,440,466,493,
+    523,554,587,622,659,698,739,783,830,880,932,987
+};
+
+enum key {C1, C1_, D1, D1_, E1, F1, F1_, G1, G1_, A1, A1_, B1,
+          C2, C2_, D2, D2_, E2, F2, F2_, G2, G2_, A2, A2_, B2, REST};
+enum note{N16=BASE/4, N8=BASE/2, N4=BASE, N2=BASE*2, N1=BASE*4};
+
+extern volatile int note_timer;      
+extern volatile int song_index;       
+
+const int song1[][2] = {
+    {E1, N8}, {G1, N8}, {A1, N8}, {C2, N8},
+    {B1, N8}, {A1, N8}, {G1, N8}, {E1, N8},
+
+    {F1, N8}, {A1, N8}, {C2, N8}, {D2, N8},
+    {C2, N8}, {A1, N8}, {F1, N8}, {REST, N8}
+};
+const char * note_name[] = {"C1", "C1#", "D1", "D1#", "E1", "F1", "F1#", "G1", "G1#", "A1", "A1#", "B1", "C2", "C2#", "D2", "D2#", "E2", "F2", "F2#", "G2", "G2#", "A2", "A2#", "B2"};
+
+void Play_Background_Music(void)
+{
+    if (note_timer > 0)
+    {
+        note_timer--;
+        return;
+    }
+
+    int tone = song1[song_index][0];
+    int duration = song1[song_index][1];
+
+    if (tone != REST)
+        TIM3_Out_Freq_Generation(tone_value[tone]);
+    else
+        TIM3_Out_Stop();
+
+    note_timer = duration / 10; 
+    song_index++;
+
+    if (song_index >= sizeof(song1)/sizeof(song1[0]))
+        song_index = 0;
+}
+
 // ----------------------------------------System_Init-------------------------------------------//
 void System_Init(void)
 {
+    song_index = 0;
+    note_timer = 0;
+
     Clock_Init();
     LED_Init();
     Key_Poll_Init();
     Uart1_Init(115200);
+    TIM3_Out_Init();
+    TIM4_10ms_Interrupt_Init();
 
     SCB->VTOR = 0x08003000;
     SCB->SHCSR = 7<<16;
 
-    srand(SysTick->VAL + TIM4_expired);
+    srand(SysTick->VAL + TIM2->CNT);
 }
 
 // ----------------------------------------Init-------------------------------------------//
@@ -302,6 +357,7 @@ void Collision_Update(void)
                 }
             }
         }
+        
     }
 
     for (i = 0; i < ITEM_MAX; i++)
@@ -387,6 +443,7 @@ void Game_Init(void)
     player_x = LCDW/2 - PLAYER_SIZE_X/2;
     player_y = LCDH - PLAYER_SIZE_Y - 10;
     score = 0;
+
     Lcd_Clr_Screen();
     Bullet_Init();
     Enemy_Init();
@@ -444,7 +501,7 @@ void Game_Update(void)
     if (fire_delay > 0) fire_delay--;
 
     int fire_interval;
-    
+
     switch (speed_item)
     {
         case 0: fire_interval = 15; break;

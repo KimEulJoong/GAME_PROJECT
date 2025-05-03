@@ -59,6 +59,7 @@ extern void TIM4_Out_PWM_Generation(unsigned int freq, unsigned int duty);
 extern void TIM4_Out_Stop(void);
 extern void TIM4_Change_Duty(unsigned int duty);
 extern void TIM2_Delay2(int time);
+extern void TIM4_10ms_Interrupt_Init(void);
 
 // Asm_Function.s
 

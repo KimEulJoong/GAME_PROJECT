@@ -226,3 +226,55 @@ void TIM4_10ms_Interrupt_Init(void)
     TIM4->CR1 |= 1;           
     NVIC_EnableIRQ(TIM4_IRQn); 
 }
+
+void TIM3_Delay(int time)
+{
+	int i;
+	unsigned int t = TIME2_PLS_OF_1ms * time;
+
+	Macro_Set_Bit(RCC->APB1ENR, 0);
+
+	TIM2->PSC = (unsigned int)(TIMXCLK/(double)TIM2_FREQ + 0.5)-1;
+	TIM2->CR1 = (1<<4)|(1<<3);
+	TIM2->ARR = 0xffff;
+	Macro_Set_Bit(TIM2->EGR,0);
+	Macro_Set_Bit(TIM2->DIER, 0);
+
+	for(i=0; i<(t/0xffff); i++)
+	{
+		Macro_Set_Bit(TIM2->EGR,0);
+		Macro_Clear_Bit(TIM2->SR, 0);
+		Macro_Set_Bit(TIM2->CR1, 0);
+		while(Macro_Check_Bit_Clear(TIM2->SR, 0));
+	}
+
+	TIM2->ARR = t % 0xffff;
+	Macro_Set_Bit(TIM2->EGR,0);
+	Macro_Clear_Bit(TIM2->SR, 0);
+	Macro_Set_Bit(TIM2->CR1, 0);
+	while (Macro_Check_Bit_Clear(TIM2->SR, 0));
+
+	Macro_Clear_Bit(TIM2->CR1, 0);
+	Macro_Clear_Bit(TIM2->DIER, 0);
+	Macro_Clear_Bit(RCC->APB1ENR, 0);
+}
+
+void TIM3_Delay2(int time)
+{
+	Macro_Set_Bit(RCC->APB1ENR, 0);
+
+	// TIM2 CR1 설정: down count, one pulse
+	TIM2->CR1 = (1<<4)|(1<<3);
+	// PSC 초기값 설정 => 20usec tick이 되도록 설계 (50KHz)
+	TIM2->PSC = (unsigned int)(TIMXCLK/50000.0 + 0.5)-1;
+	// ARR 초기값 설정 => 요청한 time msec에 해당하는 초기값 설정
+	TIM2->ARR = (unsigned int)(time*50000.0/1000.0 + 0.5)-1;
+	// UG 이벤트 발생
+	TIM2->EGR = 1<<0;
+	// Update Interrupt Pending Clear(pending: flag가 발생하면)
+	Macro_Clear_Bit(TIM2->SR, 0);
+	// Update Interrupt Enable(임시보류)
+
+	// TIM2 start
+	Macro_Set_Bit(TIM2->CR1, 0);
+}

@@ -572,13 +572,23 @@ void TIM3_IRQHandler(void)
  * Output         : None
  * Return         : None
  *******************************************************************************/
- volatile int TIM4_expired = 0;
+extern void Play_Background_Music(void);
+extern volatile int note_timer;
+extern volatile int song_index;
 
- void TIM4_IRQHandler(void)
- {
-   TIM4_expired = 1;
-   Macro_Clear_Bit(TIM4->SR, 0);
- }
+void TIM4_IRQHandler(void)
+{
+    if (TIM4->SR & 0x01)
+    {
+        TIM4->SR &= ~0x01;  // 인터럽트 플래그 클리어
+
+        if (note_timer > 0)
+            note_timer--;
+
+        if (note_timer == 0)
+            Play_Background_Music();  // 다음 음 재생
+    }
+}
 
 /*******************************************************************************
  * Function Name  : I2C1_EV_IRQHandler

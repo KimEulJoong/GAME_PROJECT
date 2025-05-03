@@ -216,3 +216,13 @@ void TIM2_Delay2(int time)
 	// TIM2 start
 	Macro_Set_Bit(TIM2->CR1, 0);
 }
+
+void TIM4_10ms_Interrupt_Init(void)
+{
+    RCC->APB1ENR |= (1 << 2);  
+    TIM4->PSC = 7200 - 1;     
+    TIM4->ARR = 100 - 1;      
+    TIM4->DIER |= 1;         
+    TIM4->CR1 |= 1;           
+    NVIC_EnableIRQ(TIM4_IRQn); 
+}
